@@ -1,7 +1,7 @@
 {
-  "name": "kue/kue",
+  "name": "redcode/kue",
   "description": "Kue is a priority job queue backed by redis",
-  "keywords": ["kue", "background jobs", "jobs queue"],
+  "keywords": ["kue", "redis", "worker", "job", "queue", "client"],
   "license": "MIT",
   "authors": [
     {
@@ -10,7 +10,7 @@
     }
   ],
   "require": {
-    "php": ">=5.3.9",
+    "php": ">=5.4",
     "pagon/fiber": "0.3.0"
   },
   "autoload": {

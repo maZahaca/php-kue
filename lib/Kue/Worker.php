@@ -42,7 +42,8 @@ class Worker extends EventEmitter
         $this->queue = $queue;
         $this->type = $type;
         $this->client = $queue->client;
-        $this->id = (function_exists('gethostname') ? gethostname() : php_uname('n')) . ':' . getmypid() . ($type ? ':' . $type : '');
+        $this->id = (function_exists('gethostname') ? gethostname() : php_uname('n')).':'.getmypid(
+            ).($type ? ':'.$type : '');
     }
 
     /**
@@ -70,16 +71,29 @@ class Worker extends EventEmitter
         $job->set('worker', $this->id);
         try {
             $start = Util::now();
-            $this->queue->emit('process:' . $job->type, $job);
+            $error = $result = null;
+            $done = function ($e = null, $res = null) use (&$error, &$result) {
+                $error = $e ? $e : null;
+                $result = $res ? $res : null;
+            };
 
+            $this->queue->emit('process:'.$job->type, $job, $done);
+
+            if ($error) {
+                throw $error instanceof \Exception ? $error : new \Exception($error);
+            }
             // Retry when failed
-            if ($job->state == 'failed') throw new AttemptException("failed to attempts");
+            if ($job->state == 'failed') {
+                throw new AttemptException("failed to attempts");
+            }
 
             $duration = Util::now() - $start;
-            $job->complete();
+            $job->complete($result);
             $job->set('duration', $duration);
         } catch (\Exception $e) {
-            if ($e instanceof AttemptException) $e = null;
+            if ($e instanceof AttemptException) {
+                $e = null;
+            }
 
             $this->failed($job, $e);
         }
@@ -94,25 +108,32 @@ class Worker extends EventEmitter
     public function failed(Job $job, $error)
     {
         $job->error($error);
-        $job->attempt(function ($remaining) use ($job) {
-            $remaining ? $job->inactive() : $job->failed();
-        });
+        $job->attempt(
+            function ($remaining) use ($job) {
+                $remaining ? $job->inactive() : $job->failed();
+            }
+        );
     }
 
     /**
      * Pop a job
      *
      * @param string $key
+     *
      * @return mixed
      */
     public function pop($key)
     {
-        $ret = $this->client->zrevrangebyscore($key, Util::now(), '-inf', array('limit' => array(0, 1)));
+        $ret = $this->client->zRevRangeByScore($key, Util::now(), '-inf', ['limit' => [0, 1]]);
 
-        if (!$ret) return false;
+        if (!$ret) {
+            return false;
+        }
 
         // Delete error will lose the control job
-        if (!$this->client->zrem($key, $ret[0])) return false;
+        if (!$this->client->zRem($key, $ret[0])) {
+            return false;
+        }
 
         return $ret[0];
     }
@@ -124,7 +145,7 @@ class Worker extends EventEmitter
      */
     public function getJob()
     {
-        if (!$id = $this->pop('q:jobs:' . ($this->type ? $this->type . ':' : '') . 'inactive')) {
+        if (!$id = $this->pop('q:jobs:'.($this->type ? $this->type.':' : '').'inactive')) {
             return false;
         }
 

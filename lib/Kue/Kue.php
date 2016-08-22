@@ -6,13 +6,14 @@ use Pagon\Fiber;
 
 class Kue extends Fiber
 {
-    protected $injectors = array(
-        'host'   => 'localhost',
-        'port'   => '6379',
-        'db'     => 0,
+    protected $injectors = [
+        'host' => 'localhost',
+        'port' => '6379',
+        'db' => 0,
         'client' => null,
-        'mode'   => false
-    );
+        'mode' => false,
+        'password' => false,
+    ];
 
     /**
      * @var Kue
@@ -28,13 +29,15 @@ class Kue extends Fiber
      * Create queue for jobs
      *
      * @param array $options
+     *
      * @return Kue
      */
-    public static function createQueue(array $options = array())
+    public static function createQueue(array $options = [])
     {
         if (!self::$instance) {
             self::$instance = new self($options);
         }
+
         return self::$instance;
     }
 
@@ -43,28 +46,36 @@ class Kue extends Fiber
      */
     public static function handleError()
     {
-        set_error_handler(function ($type, $message, $file, $line) {
-            if (error_reporting() & $type) throw new \ErrorException($message, $type, 0, $file, $line);
-        });
+        set_error_handler(
+            function ($type, $message, $file, $line) {
+                if (error_reporting() & $type) {
+                    throw new \ErrorException($message, $type, 0, $file, $line);
+                }
+            }
+        );
     }
 
     /**
      * Create queue
      *
      * @param array $options
+     *
      * @return Kue
      */
-    public function __construct(array $options = array())
+    public function __construct(array $options = [])
     {
         $this->injectors = $options + $this->injectors;
 
-        $this->client = & $this->injectors['client'];
+        $this->client = &$this->injectors['client'];
 
         if (!$this->client) {
             $this->client = new \Redis();
             $this->client->connect($this->injectors['host'], $this->injectors['port']);
             if ($this->injectors['db']) {
                 $this->client->select($this->injectors['db']);
+            }
+            if ($this->injectors['password']) {
+                $this->client->auth($this->injectors['password']);
             }
         }
     }
@@ -73,6 +84,7 @@ class Kue extends Fiber
      * Enable node mode
      *
      * @param boolean $use
+     *
      * @return $this
      */
     public function originalMode($use = null)
@@ -82,6 +94,7 @@ class Kue extends Fiber
         }
 
         $this->injectors['mode'] = $use ? 'origin' : false;
+
         return $this;
     }
 
@@ -90,11 +103,13 @@ class Kue extends Fiber
      *
      * @param string $type
      * @param array  $data
+     *
      * @return Job
      */
-    public function create($type, array $data = array())
+    public function create($type, array $data = [])
     {
         $this->emit('create', $type, $data);
+
         return new Job($type, $data);
     }
 
@@ -111,7 +126,7 @@ class Kue extends Fiber
             $type = null;
         }
         if ($fn) {
-            $this->on('process:' . ($type ? $type : '*'), $fn);
+            $this->on('process:'.($type ? $type : '*'), $fn);
         }
         $this->emit('process', $type, $fn);
         $worker = new Worker($this, $type);
@@ -123,15 +138,18 @@ class Kue extends Fiber
      *
      * @param string     $name
      * @param string|int $value
+     *
      * @return mixed
      */
     public function setting($name, $value = null)
     {
         if ($value) {
-            $this->client->hset('q:settings', $name, $value);
+            $this->client->hSet('q:settings', $name, $value);
+
             return $this;
         }
-        return $this->client->hget('q:settings', $name);
+
+        return $this->client->hGet('q:settings', $name);
     }
 
     /**
@@ -141,29 +159,31 @@ class Kue extends Fiber
      */
     public function types()
     {
-        return $this->client->smembers('q:job:types');
+        return $this->client->sMembers('q:job:types');
     }
 
     /**
      * Get all by state
      *
      * @param string $state
+     *
      * @return mixed
      */
     public function state($state)
     {
-        return $this->client->zrange('q:jobs:' . $state, 0, -1);
+        return $this->client->zRange('q:jobs:'.$state, 0, -1);
     }
 
     /**
      * Get jobs by state
      *
      * @param string $state
+     *
      * @return mixed
      */
     public function card($state)
     {
-        return $this->client->zcard('q:jobs:' . $state);
+        return $this->client->zCard('q:jobs:'.$state);
     }
 
     /**
