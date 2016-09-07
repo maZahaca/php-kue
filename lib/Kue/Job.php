@@ -45,9 +45,11 @@ class Job extends Fiber
                 'priority' => 0,
                 'progress' => 0,
                 'state' => 'inactive',
+                'backoff' => null,
                 'error' => '',
                 'created_at' => '',
                 'updated_at' => '',
+                'promote_at' => 0,
                 'failed_at' => '',
                 'duration' => 0,
                 'timing' => 0,
@@ -80,9 +82,14 @@ class Job extends Fiber
             return false;
         }
 
-        $data['data'] = json_decode($data['data'], true);
+        if (array_key_exists('data', $data)) {
+            $data['data'] = json_decode($data['data'], true);
+        }
         if (array_key_exists('result', $data)) {
             $data['result'] = json_decode($data['result'], true);
+        }
+        if (array_key_exists('backoff', $data)) {
+            $data['backoff'] = json_decode($data['backoff'], true);
         }
         $job = new self($data['type'], null);
         $job->append($data);
@@ -142,6 +149,31 @@ class Job extends Fiber
     }
 
     /**
+     * @param int $remainingAttempts
+     * @param int $attemptNumber
+     *
+     * @return self
+     */
+    public function reattempt($remainingAttempts, $attemptNumber)
+    {
+        if ($remainingAttempts) {
+            $backoffFn = $this->getBackoffImpl();
+            if ($backoffFn instanceof \Closure) {
+                $delay = $backoffFn($attemptNumber);
+                $this->delay($delay);
+
+                return $this;
+            }
+
+            $this->inactive();
+        } else {
+            $this->failed();
+        }
+
+        return $this;
+    }
+
+    /**
      * Timing job
      *
      * @param int|string $time
@@ -162,6 +194,47 @@ class Job extends Fiber
         }
 
         return $this;
+    }
+
+    /**
+     * @param array $param
+     *
+     * @return $this
+     */
+    public function backoff($param = null)
+    {
+        if ($param === null) {
+            return $this->injectors['backoff'];
+        }
+        $this->injectors['backoff'] = $param;
+
+        return $this;
+    }
+
+    private function getBackoffImpl()
+    {
+        $supportedBackoffs = [
+            'fixed' => function ($delay) {
+                return function ($attempts) use ($delay) {
+                    return $delay;
+                };
+            },
+            'exponential' => function ($delay) {
+                return function ($attempts) use ($delay) {
+                    return round($delay * 0.5 * (pow(2, $attempts) - 1));
+                };
+            },
+        ];
+
+        if (is_array($this->injectors['backoff'])) {
+            $delay = isset($this->injectors['backoff']['delay']) ?
+                $this->injectors['backoff']['delay'] :
+                $this->injectors['delay'];
+
+            return $supportedBackoffs[$this->injectors['backoff']['type']]($delay);
+        }
+
+        return $this->injectors['backoff']['type'];
     }
 
     /**

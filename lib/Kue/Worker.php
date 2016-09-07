@@ -42,8 +42,8 @@ class Worker extends EventEmitter
         $this->queue = $queue;
         $this->type = $type;
         $this->client = $queue->client;
-        $this->id = (function_exists('gethostname') ? gethostname() : php_uname('n')).':'.getmypid(
-            ).($type ? ':'.$type : '');
+        $this->id = (function_exists('gethostname') ? gethostname() : php_uname('n')).':'.
+            getmypid().($type ? ':'.$type : '');
     }
 
     /**
@@ -109,8 +109,8 @@ class Worker extends EventEmitter
     {
         $job->error($error);
         $job->attempt(
-            function ($remaining) use ($job) {
-                $remaining ? $job->inactive() : $job->failed();
+            function ($remaining, $attempts) use ($job) {
+                $job->reattempt($remaining, $attempts + 1);
             }
         );
     }
