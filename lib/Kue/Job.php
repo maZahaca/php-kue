@@ -42,6 +42,7 @@ class Job extends Fiber
                 'id' => null,
                 'type' => null,
                 'data' => [],
+                'result' => null,
                 'priority' => 0,
                 'progress' => 0,
                 'state' => 'inactive',
