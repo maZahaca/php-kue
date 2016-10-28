@@ -9,6 +9,12 @@
       "email": "hfcorriez@gmail.com"
     }
   ],
+  "repositories": [
+      {
+          "type": "vcs",
+          "url": "https://github.com/maZahaca/fiber"
+      }
+  ],
   "require": {
     "php": ">=5.4",
     "pagon/fiber": "0.3.x-dev"
