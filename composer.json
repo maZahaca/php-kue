@@ -11,7 +11,7 @@
   ],
   "require": {
     "php": ">=5.4",
-    "pagon/fiber": "0.3.0"
+    "pagon/fiber": "0.3.x-dev"
   },
   "autoload": {
     "psr-0": {
