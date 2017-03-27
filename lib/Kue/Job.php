@@ -288,7 +288,7 @@ class Job extends Fiber
         $this->emit('error', $error);
 
         if ($error instanceof \Exception) {
-            $str = get_class($error).' Error on '.$error->getFile().' '.$error->getLine();
+            $str = $error->getMessage() . " \n " . get_class($error).' Error on '.$error->getFile().' '.$error->getLine();
             $str .= $error->getTraceAsString();
         } else {
             $str = $error;
