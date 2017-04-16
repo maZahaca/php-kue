@@ -93,7 +93,7 @@ class Job extends Fiber
             $data['backoff'] = json_decode($data['backoff'], true);
         }
         $job = new self($data['type'], null);
-        $job->append($data);
+        $job->append($data + ['id' => $id]);
 
         return $job;
     }
